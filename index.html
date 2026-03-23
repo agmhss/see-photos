@@ -3,46 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AGMHSS | Infinite Photo Stream</title>
+    <title>AGMHSS Smart Gallery</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #0f172a;
+            --bg: #020617;
             --accent: #38bdf8;
-            --height: 280px;
+            --cream: rgba(255, 253, 230, 0.3);
+            --h: 350px;
         }
 
         body {
             margin: 0;
             background: var(--bg);
             color: white;
-            font-family: system-ui, -apple-system, sans-serif;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             overflow-x: hidden;
         }
 
-        .header {
-            padding: 2rem;
-            text-align: center;
-            background: rgba(0,0,0,0.3);
+        /* Persistent Input Section */
+        .search-area {
+            margin: 50px 0;
+            width: 90%;
+            max-width: 700px;
+            display: flex;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+            border-radius: 50px;
+            overflow: hidden;
+            background: #1e293b;
         }
 
-        /* The Ticker System */
-        .ticker-viewport {
+        #albumLink {
+            flex: 1;
+            padding: 18px 25px;
+            border: none;
+            background: transparent;
+            color: white;
+            font-size: 16px;
+            outline: none;
+        }
+
+        #loadBtn {
+            padding: 0 30px;
+            background: var(--accent);
+            color: #020617;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        #loadBtn:hover { background: white; }
+
+        /* Ticker Container */
+        .ticker-frame {
             width: 100%;
-            height: var(--height);
-            background: #000;
-            position: relative;
-            display: flex;
+            height: var(--h);
+            background: rgba(0,0,0,0.5);
+            display: none;
             align-items: center;
-            border-y: 1px solid #334155;
+            border-y: 1px solid #1e293b;
             overflow: hidden;
         }
 
-        .ticker-track {
+        .track {
             display: flex;
-            flex-direction: row;
             white-space: nowrap;
-            will-change: transform;
-            /* Animation starts slow, then speeds up as photos load */
             animation: scroll 60s linear infinite;
         }
 
@@ -51,155 +80,147 @@
             100% { transform: translateX(-50%); }
         }
 
-        .ticker-track img {
-            height: calc(var(--height) - 60px);
-            margin: 0 10px;
-            border-radius: 12px;
-            cursor: zoom-in;
-            opacity: 0;
-            transform: scale(0.9);
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        .photo-wrap {
+            position: relative;
+            height: calc(var(--h) - 80px);
+            margin: 0 20px;
+            flex-shrink: 0;
+        }
+
+        .photo-wrap img {
+            height: 100%;
+            border-radius: 15px;
+            transition: transform 0.5s ease;
+            cursor: pointer;
             object-fit: cover;
         }
 
-        .ticker-track img.loaded {
-            opacity: 1;
-            transform: scale(1);
+        /* Digital Metadata */
+        .timestamp {
+            position: absolute;
+            bottom: 12px;
+            right: 15px;
+            font-family: 'Orbitron', sans-serif;
+            color: var(--cream);
+            font-size: 10px;
+            text-align: right;
+            pointer-events: none;
+            line-height: 1.4;
         }
 
-        /* Hover Zoom Logic */
-        .ticker-track img:hover {
+        /* Hover Zoom Engine */
+        .photo-wrap:hover img {
             position: fixed;
             top: 50%;
             left: 50%;
-            transform: translate(-50%, -50%) scale(2.2);
+            transform: translate(-50%, -50%) scale(2.8);
             z-index: 9999;
-            box-shadow: 0 0 80px rgba(0,0,0,1);
-            outline: 5000px solid rgba(0,0,0,0.8);
-            cursor: zoom-out;
+            outline: 5000px solid rgba(0,0,0,0.85);
+            box-shadow: 0 0 100px #000;
         }
 
-        /* UI Elements */
-        #status-bar {
-            text-align: center;
-            padding: 10px;
-            font-size: 0.85rem;
-            color: var(--accent);
+        .photo-wrap:hover .timestamp {
+            position: fixed;
+            z-index: 10000;
+            bottom: 10%;
+            right: 10%;
+            font-size: 24px;
+            color: rgba(255, 253, 230, 0.7);
         }
 
-        .loader {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border: 2px solid var(--accent);
-            border-radius: 50%;
-            border-top-color: transparent;
-            animation: spin 1s linear infinite;
-            margin-right: 8px;
-        }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
+        #status { color: #64748b; margin-top: 10px; font-size: 0.9rem; }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <h2 style="margin:0">AGMHSS Digital Gallery</h2>
-        <p style="opacity:0.7">Hover to Inspect • Double-Tap to Resume</p>
-    </div>
+    <h1 style="margin-top: 60px; letter-spacing: 2px;">SMART SCHOOL TICKER</h1>
 
-    <div class="ticker-viewport">
-        <div class="ticker-track" id="track"></div>
+    <div class="search-area">
+        <input type="text" id="albumLink" placeholder="Paste Google Photos Album Link here...">
+        <button id="loadBtn" onclick="run()">LOAD</button>
     </div>
+    
+    <div id="status">Link will be saved for your next visit.</div>
 
-    <div id="status-bar">
-        <span class="loader" id="spinner"></span>
-        <span id="msg">Initializing stream...</span>
+    <div class="ticker-frame" id="frame">
+        <div class="track" id="track"></div>
     </div>
 
     <script>
-        // REPLACE THIS WITH YOUR SHARED GOOGLE PHOTOS LINK
-        const ALBUM_URL = 'https://photos.app.goo.gl/your-album-link-here';
-        
-        const track = document.getElementById('track');
-        const msg = document.getElementById('msg');
-        const spinner = document.getElementById('spinner');
         let resumeTimer;
+        const input = document.getElementById('albumLink');
+        const track = document.getElementById('track');
+        const frame = document.getElementById('frame');
+        const status = document.getElementById('status');
 
-        // 1. Setup global resume function
-        function resume() {
-            track.style.animationPlayState = 'running';
-            msg.innerText = "Hover to zoom. Ticker active.";
-            clearTimeout(resumeTimer);
-        }
+        // 1. Persistence: Load link from local storage on startup
+        window.onload = () => {
+            const savedLink = localStorage.getItem('agmhss_album_link');
+            if (savedLink) {
+                input.value = savedLink;
+                run(); // Auto-load if link exists
+            }
+        };
 
-        // 2. Add interactions to each image
-        function attachEvents(img) {
-            img.addEventListener('mouseenter', () => {
-                track.style.animationPlayState = 'paused';
-                msg.innerText = "Paused. Auto-resuming in 10s...";
-                clearTimeout(resumeTimer);
-                resumeTimer = setTimeout(resume, 10000);
-            });
+        async function run() {
+            const url = input.value.trim();
+            if(!url) return;
 
-            img.addEventListener('dblclick', resume);
-        }
+            // Save to local storage so it stays there
+            localStorage.setItem('agmhss_album_link', url);
 
-        // 3. The Streamer Logic
-        async function loadStream() {
+            track.innerHTML = "";
+            status.innerText = "Syncing with Cloud...";
+            
             try {
-                // CHANGED TO CORSPROXY.IO
-                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(ALBUM_URL)}`;
-                const response = await fetch(proxyUrl);
-                const html = await response.text();
+                const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+                const res = await fetch(proxy);
+                const data = await res.json();
                 
-                // Extracting photos using regex
                 const regex = /"(https:\/\/lh3\.googleusercontent\.com\/pw\/[a-zA-Z0-9\-_]*)"/g;
-                let match;
-                const uniquePhotos = [];
+                const images = Array.from(new Set([...data.contents.matchAll(regex)].map(m => m[1])));
 
-                while ((match = regex.exec(html)) !== null) {
-                    if (!uniquePhotos.includes(match[1])) {
-                        const photoUrl = match[1];
-                        uniquePhotos.push(photoUrl);
+                if(images.length === 0) throw new Error("No public photos found.");
 
-                        // Injecting immediately into the DOM
-                        const img = document.createElement('img');
-                        img.src = `${photoUrl}=w800`;
-                        attachEvents(img);
-                        track.appendChild(img);
+                const dateStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
 
-                        // Small delay for smooth entry
-                        setTimeout(() => img.classList.add('loaded'), 50);
-                        
-                        msg.innerText = `Loading Gallery... (${uniquePhotos.length} photos found)`;
-                    }
-                }
+                // Generate Ticker Content
+                [...images, ...images].forEach(src => {
+                    const wrap = document.createElement('div');
+                    wrap.className = 'photo-wrap';
 
-                // 4. Logistics: Duplicate for Infinite Scroll ONLY after all found
-                if (uniquePhotos.length > 0) {
-                    uniquePhotos.forEach(url => {
-                        const clone = document.createElement('img');
-                        clone.src = `${url}=w800`;
-                        clone.className = 'loaded'; // Clones appear instantly
-                        attachEvents(clone);
-                        track.appendChild(clone);
+                    const img = document.createElement('img');
+                    img.src = `${src}=w1200`; // High-res for the zoom
+
+                    const meta = document.createElement('div');
+                    meta.className = 'timestamp';
+                    meta.innerHTML = `${dateStr}<br>BY: RAJARAJAN`;
+
+                    wrap.appendChild(img);
+                    wrap.appendChild(meta);
+
+                    // Interactions
+                    wrap.addEventListener('mouseenter', () => {
+                        track.style.animationPlayState = 'paused';
+                        clearTimeout(resumeTimer);
+                        resumeTimer = setTimeout(() => track.style.animationPlayState = 'running', 10000);
                     });
-                    
-                    spinner.style.display = 'none';
-                    msg.innerText = `Loaded ${uniquePhotos.length} photos. Continuous loop ready.`;
-                } else {
-                    msg.innerText = "No photos found. Check if album is public.";
-                }
 
-            } catch (err) {
-                console.error(err);
-                msg.innerText = "Error fetching album. Please refresh.";
+                    wrap.addEventListener('dblclick', () => {
+                        track.style.animationPlayState = 'running';
+                        clearTimeout(resumeTimer);
+                    });
+
+                    track.appendChild(wrap);
+                });
+
+                frame.style.display = "flex";
+                status.innerText = `Displaying ${images.length} images. Double-tap to resume scroll.`;
+
+            } catch (e) {
+                status.innerText = "Error: " + e.message;
             }
         }
-
-        // Start the process
-        loadStream();
     </script>
 </body>
-</html>
+    </html>
