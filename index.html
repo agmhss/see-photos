@@ -4,33 +4,40 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AGMHSS Smart Gallery</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron&amp;display=swap" rel="stylesheet">
     <style>
         :root {
             --bg: #020617;
             --accent: #38bdf8;
             --cream: rgba(255, 253, 230, 0.3);
-            --h: 350px;
+            --h: 380px;
         }
 
         body {
             margin: 0;
             background: var(--bg);
             color: white;
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', system-ui, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             overflow-x: hidden;
+            min-height: 100vh;
         }
 
-        /* Persistent Input Section */
+        h1 {
+            margin: 60px 20px 20px;
+            letter-spacing: 3px;
+            font-size: 2.2rem;
+            text-align: center;
+        }
+
         .search-area {
-            margin: 50px 0;
+            margin: 20px 0 30px;
             width: 90%;
-            max-width: 700px;
+            max-width: 720px;
             display: flex;
-            box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+            box-shadow: 0 0 25px rgba(56, 189, 248, 0.25);
             border-radius: 50px;
             overflow: hidden;
             background: #1e293b;
@@ -47,97 +54,110 @@
         }
 
         #loadBtn {
-            padding: 0 30px;
+            padding: 0 35px;
             background: var(--accent);
             color: #020617;
             border: none;
-            font-weight: bold;
+            font-weight: 700;
             cursor: pointer;
-            transition: 0.3s;
+            transition: all 0.3s;
         }
 
-        #loadBtn:hover { background: white; }
+        #loadBtn:hover { background: white; transform: scale(1.05); }
 
-        /* Ticker Container */
         .ticker-frame {
             width: 100%;
             height: var(--h);
-            background: rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.6);
             display: none;
             align-items: center;
-            border-y: 1px solid #1e293b;
+            border-top: 1px solid #1e293b;
+            border-bottom: 1px solid #1e293b;
             overflow: hidden;
+            position: relative;
         }
 
         .track {
             display: flex;
             white-space: nowrap;
-            animation: scroll 60s linear infinite;
+            animation: scroll 65s linear infinite;
+            padding: 20px 0;
         }
 
         @keyframes scroll {
-            0% { transform: translateX(0); }
+            0%   { transform: translateX(0); }
             100% { transform: translateX(-50%); }
         }
 
         .photo-wrap {
             position: relative;
-            height: calc(var(--h) - 80px);
-            margin: 0 20px;
+            height: calc(var(--h) - 70px);
+            margin: 0 18px;
             flex-shrink: 0;
+            cursor: pointer;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
         }
 
         .photo-wrap img {
             height: 100%;
-            border-radius: 15px;
-            transition: transform 0.5s ease;
-            cursor: pointer;
+            width: auto;
             object-fit: cover;
+            transition: transform 0.4s ease;
+            display: block;
         }
 
-        /* Digital Metadata */
         .timestamp {
             position: absolute;
-            bottom: 12px;
-            right: 15px;
+            bottom: 10px;
+            right: 14px;
             font-family: 'Orbitron', sans-serif;
             color: var(--cream);
-            font-size: 10px;
+            font-size: 11px;
             text-align: right;
+            line-height: 1.3;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
             pointer-events: none;
-            line-height: 1.4;
         }
 
-        /* Hover Zoom Engine */
-        .photo-wrap:hover img {
+        /* Full-screen zoom overlay */
+        #zoom-overlay {
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) scale(2.8);
-            z-index: 9999;
-            outline: 5000px solid rgba(0,0,0,0.85);
-            box-shadow: 0 0 100px #000;
-        }
-
-        .photo-wrap:hover .timestamp {
-            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
             z-index: 10000;
-            bottom: 10%;
-            right: 10%;
-            font-size: 24px;
-            color: rgba(255, 253, 230, 0.7);
+            cursor: zoom-out;
         }
 
-        #status { color: #64748b; margin-top: 10px; font-size: 0.9rem; }
+        #zoom-overlay img {
+            max-width: 92%;
+            max-height: 92%;
+            border-radius: 12px;
+            box-shadow: 0 0 80px rgba(0,0,0,0.9);
+        }
+
+        #status {
+            color: #64748b;
+            margin-top: 12px;
+            font-size: 0.95rem;
+            text-align: center;
+            min-height: 1.2em;
+        }
+
+        .loading { color: var(--accent); }
     </style>
 </head>
 <body>
 
-    <h1 style="margin-top: 60px; letter-spacing: 2px;">SMART SCHOOL TICKER</h1>
+    <h1>SMART SCHOOL TICKER</h1>
 
     <div class="search-area">
         <input type="text" id="albumLink" placeholder="Paste Google Photos Album Link here...">
-        <button id="loadBtn" onclick="run()">LOAD</button>
+        <button id="loadBtn">LOAD</button>
     </div>
     
     <div id="status">Link will be saved for your next visit.</div>
@@ -146,81 +166,173 @@
         <div class="track" id="track"></div>
     </div>
 
+    <!-- Zoom Overlay -->
+    <div id="zoom-overlay">
+        <img id="zoom-img" alt="Zoomed photo">
+    </div>
+
     <script>
-        let resumeTimer;
         const input = document.getElementById('albumLink');
         const track = document.getElementById('track');
         const frame = document.getElementById('frame');
         const status = document.getElementById('status');
+        const zoomOverlay = document.getElementById('zoom-overlay');
+        const zoomImg = document.getElementById('zoom-img');
 
-        // 1. Persistence: Load link from local storage on startup
+        let resumeTimer = null;
+        let isPaused = false;
+
+        // Load saved link + auto-run
         window.onload = () => {
-            const savedLink = localStorage.getItem('agmhss_album_link');
-            if (savedLink) {
-                input.value = savedLink;
-                run(); // Auto-load if link exists
+            const saved = localStorage.getItem('agmhss_album_link');
+            if (saved) {
+                input.value = saved;
+                run();
             }
         };
 
+        // Save on input change (optional debounce)
+        input.addEventListener('change', () => {
+            if (input.value.trim()) localStorage.setItem('agmhss_album_link', input.value.trim());
+        });
+
         async function run() {
             const url = input.value.trim();
-            if(!url) return;
+            if (!url) {
+                status.textContent = "Please paste a valid Google Photos album link.";
+                return;
+            }
 
-            // Save to local storage so it stays there
             localStorage.setItem('agmhss_album_link', url);
+            track.innerHTML = '';
+            frame.style.display = 'none';
+            status.classList.add('loading');
+            status.textContent = 'Fetching album from Google Photos...';
 
-            track.innerHTML = "";
-            status.innerText = "Syncing with Cloud...";
-            
             try {
-                const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-                const res = await fetch(proxy);
-                const data = await res.json();
-                
-                const regex = /"(https:\/\/lh3\.googleusercontent\.com\/pw\/[a-zA-Z0-9\-_]*)"/g;
-                const images = Array.from(new Set([...data.contents.matchAll(regex)].map(m => m[1])));
+                // Try multiple CORS proxies
+                let html = '';
+                const proxies = [
+                    `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+                    `https://corsproxy.io/?${encodeURIComponent(url)}`
+                ];
 
-                if(images.length === 0) throw new Error("No public photos found.");
+                for (const proxy of proxies) {
+                    try {
+                        const res = await fetch(proxy);
+                        if (!res.ok) throw new Error('Proxy failed');
+                        const data = await res.json();
+                        html = data.contents || data; // some proxies return {contents}, others raw
+                        if (html && html.length > 5000) break;
+                    } catch (e) {
+                        console.warn('Proxy failed, trying next...', e);
+                    }
+                }
 
-                const dateStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
+                if (!html || html.length < 10000) throw new Error("Could not load album. Make sure it's publicly shared.");
 
-                // Generate Ticker Content
-                [...images, ...images].forEach(src => {
+                // More robust regex for current Google Photos structure (2026)
+                const regex = /https:\/\/(lh3\.googleusercontent\.com|photos\.fife\.usercontent\.google\.com)\/[a-zA-Z0-9\-_\/]+/g;
+                let matches = [...html.matchAll(regex)].map(m => m[0]);
+
+                // Deduplicate and clean
+                const uniqueImages = [...new Set(matches)].filter(src => 
+                    src.includes('lh3.googleusercontent.com') || src.includes('usercontent.google.com')
+                );
+
+                if (uniqueImages.length === 0) throw new Error("No photos found. Is the album public?");
+
+                const dateStr = new Date().toLocaleDateString('en-GB', { 
+                    day: '2-digit', month: '2-digit', year: 'numeric' 
+                }).replace(/\//g, '-');
+
+                // Duplicate the array for seamless infinite scroll
+                const allImages = [...uniqueImages, ...uniqueImages];
+
+                allImages.forEach(src => {
                     const wrap = document.createElement('div');
                     wrap.className = 'photo-wrap';
 
                     const img = document.createElement('img');
-                    img.src = `${src}=w1200`; // High-res for the zoom
+                    img.src = `${src}=w1400`;           // good quality for ticker + zoom
+                    img.loading = 'lazy';
+                    img.alt = 'School photo';
 
                     const meta = document.createElement('div');
                     meta.className = 'timestamp';
                     meta.innerHTML = `${dateStr}<br>BY: RAJARAJAN`;
 
-                    wrap.appendChild(img);
-                    wrap.appendChild(meta);
+                    wrap.append(img, meta);
 
-                    // Interactions
-                    wrap.addEventListener('mouseenter', () => {
-                        track.style.animationPlayState = 'paused';
-                        clearTimeout(resumeTimer);
-                        resumeTimer = setTimeout(() => track.style.animationPlayState = 'running', 10000);
-                    });
-
-                    wrap.addEventListener('dblclick', () => {
-                        track.style.animationPlayState = 'running';
-                        clearTimeout(resumeTimer);
+                    // Click to zoom
+                    wrap.addEventListener('click', () => {
+                        zoomImg.src = `${src}=w2000`;   // higher res for zoom
+                        zoomOverlay.style.display = 'flex';
+                        pauseScroll();
                     });
 
                     track.appendChild(wrap);
                 });
 
-                frame.style.display = "flex";
-                status.innerText = `Displaying ${images.length} images. Double-tap to resume scroll.`;
+                frame.style.display = 'flex';
+                status.classList.remove('loading');
+                status.textContent = `Loaded ${uniqueImages.length} photos • Tap image to zoom • Scroll pauses on interaction`;
 
-            } catch (e) {
-                status.innerText = "Error: " + e.message;
+                // Touch / mouse interaction
+                track.style.animationPlayState = 'running';
+
+                const pauseScroll = () => {
+                    track.style.animationPlayState = 'paused';
+                    isPaused = true;
+                    clearTimeout(resumeTimer);
+                };
+
+                const resumeScroll = () => {
+                    track.style.animationPlayState = 'running';
+                    isPaused = false;
+                };
+
+                track.addEventListener('mouseenter', pauseScroll);
+                track.addEventListener('mouseleave', () => {
+                    if (!isPaused) resumeScroll();
+                });
+
+                // Tap anywhere on track to toggle pause (great for touch devices)
+                track.addEventListener('click', (e) => {
+                    if (e.target.closest('#zoom-overlay')) return;
+                    if (isPaused) resumeScroll();
+                    else pauseScroll();
+                });
+
+                // Auto-resume after 12 seconds of inactivity
+                track.addEventListener('mouseleave', () => {
+                    clearTimeout(resumeTimer);
+                    resumeTimer = setTimeout(() => {
+                        if (!isPaused) resumeScroll();
+                    }, 12000);
+                });
+
+            } catch (err) {
+                status.classList.remove('loading');
+                status.textContent = `Error: ${err.message}. Make sure the album is set to "Anyone with the link"`;
+                console.error(err);
             }
         }
+
+        // Button handler
+        document.getElementById('loadBtn').addEventListener('click', run);
+
+        // Close zoom overlay
+        zoomOverlay.addEventListener('click', () => {
+            zoomOverlay.style.display = 'none';
+        });
+
+        // Keyboard support
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && zoomOverlay.style.display === 'flex') {
+                zoomOverlay.style.display = 'none';
+            }
+        });
     </script>
 </body>
     </html>
