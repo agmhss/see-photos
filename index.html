@@ -3,187 +3,203 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AGMHSS Smart School - Timestamp Gallery</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron&display=swap" rel="stylesheet">
+    <title>AGMHSS | Infinite Photo Stream</title>
     <style>
         :root {
-            --bg-color: #0f172a;
-            --accent-color: #38bdf8;
-            --ticker-height: 300px;
-            --timestamp-color: rgba(255, 253, 230, 0.4); /* Creamy white, 0.4 opacity */
+            --bg: #0f172a;
+            --accent: #38bdf8;
+            --height: 280px;
         }
 
         body {
             margin: 0;
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-color);
+            background: var(--bg);
             color: white;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            font-family: system-ui, -apple-system, sans-serif;
+            overflow-x: hidden;
         }
 
-        .controls { margin: 30px 0; text-align: center; width: 90%; max-width: 600px; }
-        
-        .input-group { display: flex; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border-radius: 25px; overflow: hidden; }
-        input { flex: 1; padding: 15px 20px; border: none; background: #1e293b; color: white; outline: none; }
-        button { padding: 15px 25px; border: none; background: var(--accent-color); color: #0f172a; font-weight: bold; cursor: pointer; }
+        .header {
+            padding: 2rem;
+            text-align: center;
+            background: rgba(0,0,0,0.3);
+        }
 
-        /* Ticker Logic */
-        .ticker-container {
+        /* The Ticker System */
+        .ticker-viewport {
             width: 100%;
-            height: var(--ticker-height);
+            height: var(--height);
             background: #000;
-            overflow: hidden;
+            position: relative;
             display: flex;
             align-items: center;
             border-y: 1px solid #334155;
-            position: relative;
+            overflow: hidden;
         }
 
         .ticker-track {
             display: flex;
+            flex-direction: row;
             white-space: nowrap;
-            animation: scroll-left 60s linear infinite;
+            will-change: transform;
+            /* Animation starts slow, then speeds up as photos load */
+            animation: scroll 60s linear infinite;
         }
 
-        @keyframes scroll-left {
+        @keyframes scroll {
             0% { transform: translateX(0); }
             100% { transform: translateX(-50%); }
         }
 
-        /* Photo Wrapper for Overlay */
-        .photo-item {
-            position: relative;
-            height: calc(var(--ticker-height) - 40px);
-            margin: 0 15px;
-            flex-shrink: 0;
-            display: inline-block;
-        }
-
-        .photo-item img {
-            height: 100%;
-            border-radius: 8px;
+        .ticker-track img {
+            height: calc(var(--height) - 60px);
+            margin: 0 10px;
+            border-radius: 12px;
+            cursor: zoom-in;
+            opacity: 0;
+            transform: scale(0.9);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
             object-fit: cover;
-            transition: 0.4s ease;
-            cursor: pointer;
         }
 
-        /* Timestamp Overlay */
-        .metadata-overlay {
-            position: absolute;
-            bottom: 15px;
-            right: 15px;
-            font-family: 'Orbitron', monospace;
-            font-size: 12px;
-            color: var(--timestamp-color);
-            text-align: right;
-            pointer-events: none; /* Let clicks pass through to the image */
-            line-height: 1.2;
+        .ticker-track img.loaded {
+            opacity: 1;
+            transform: scale(1);
         }
 
-        /* Zoom Logic */
-        .photo-item:hover img {
+        /* Hover Zoom Logic */
+        .ticker-track img:hover {
             position: fixed;
             top: 50%;
             left: 50%;
-            transform: translate(-50%, -50%) scale(2.8);
+            transform: translate(-50%, -50%) scale(2.2);
             z-index: 9999;
+            box-shadow: 0 0 80px rgba(0,0,0,1);
             outline: 5000px solid rgba(0,0,0,0.8);
-            box-shadow: 0 0 50px rgba(0,0,0,1);
+            cursor: zoom-out;
         }
 
-        /* Show full opacity and larger text on zoom */
-        .photo-item:hover .metadata-overlay {
-            position: fixed;
-            z-index: 10000;
-            bottom: 10%;
-            right: 10%;
-            font-size: 24px;
-            color: rgba(255, 253, 230, 0.8);
+        /* UI Elements */
+        #status-bar {
+            text-align: center;
+            padding: 10px;
+            font-size: 0.85rem;
+            color: var(--accent);
         }
+
+        .loader {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid var(--accent);
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-    <div class="controls">
-        <h2>Smart School - Ticker v2.0</h2>
-        <div class="input-group">
-            <input type="text" id="albumLink" placeholder="Paste Google Photos Link...">
-            <button onclick="startGallery()">LAUNCH</button>
-        </div>
-        <div id="status" style="margin-top:10px; color: #94a3b8;">Enter link to see timestamps & contributors</div>
+    <div class="header">
+        <h2 style="margin:0">AGMHSS Digital Gallery</h2>
+        <p style="opacity:0.7">Hover to Inspect • Double-Tap to Resume</p>
     </div>
 
-    <div class="ticker-container" id="tickerFrame" style="display:none;">
-        <div class="ticker-track" id="photo-track"></div>
+    <div class="ticker-viewport">
+        <div class="ticker-track" id="track"></div>
+    </div>
+
+    <div id="status-bar">
+        <span class="loader" id="spinner"></span>
+        <span id="msg">Initializing stream...</span>
     </div>
 
     <script>
+        // REPLACE THIS WITH YOUR SHARED GOOGLE PHOTOS LINK
+        const ALBUM_URL = 'https://photos.app.goo.gl/your-album-link-here';
+        
+        const track = document.getElementById('track');
+        const msg = document.getElementById('msg');
+        const spinner = document.getElementById('spinner');
         let resumeTimer;
-        const track = document.getElementById('photo-track');
 
-        async function startGallery() {
-            const url = document.getElementById('albumLink').value.trim();
-            if(!url) return;
+        // 1. Setup global resume function
+        function resume() {
+            track.style.animationPlayState = 'running';
+            msg.innerText = "Hover to zoom. Ticker active.";
+            clearTimeout(resumeTimer);
+        }
 
-            track.innerHTML = "";
-            document.getElementById('status').innerText = "Processing metadata...";
-            
+        // 2. Add interactions to each image
+        function attachEvents(img) {
+            img.addEventListener('mouseenter', () => {
+                track.style.animationPlayState = 'paused';
+                msg.innerText = "Paused. Auto-resuming in 10s...";
+                clearTimeout(resumeTimer);
+                resumeTimer = setTimeout(resume, 10000);
+            });
+
+            img.addEventListener('dblclick', resume);
+        }
+
+        // 3. The Streamer Logic
+        async function loadStream() {
             try {
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+                // CHANGED TO CORSPROXY.IO
+                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(ALBUM_URL)}`;
                 const response = await fetch(proxyUrl);
-                const data = await response.json();
+                const html = await response.text();
                 
-                // Regex to find image links
+                // Extracting photos using regex
                 const regex = /"(https:\/\/lh3\.googleusercontent\.com\/pw\/[a-zA-Z0-9\-_]*)"/g;
-                const links = Array.from(new Set([...data.contents.matchAll(regex)].map(m => m[1])));
+                let match;
+                const uniquePhotos = [];
 
-                if (links.length === 0) throw new Error("No photos found.");
+                while ((match = regex.exec(html)) !== null) {
+                    if (!uniquePhotos.includes(match[1])) {
+                        const photoUrl = match[1];
+                        uniquePhotos.push(photoUrl);
 
-                // For a Shared Album, individual names/dates aren't in the HTML source in a simple way.
-                // We will simulate the "Current Date" or a generic "AGMHSS Contributor" 
-                // unless you want to manually hardcode a list.
-                const today = new Date().toLocaleDateString('en-GB'); 
+                        // Injecting immediately into the DOM
+                        const img = document.createElement('img');
+                        img.src = `${photoUrl}=w800`;
+                        attachEvents(img);
+                        track.appendChild(img);
 
-                [...links, ...links].forEach((src, index) => {
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'photo-item';
-                    
-                    const img = document.createElement('img');
-                    img.src = `${src}=w800`;
-                    
-                    // The Overlay
-                    const overlay = document.createElement('div');
-                    overlay.className = 'metadata-overlay';
-                    // Using today's date and a generic name placeholder
-                    overlay.innerHTML = `${today}<br>ADDED BY: RAJARAJAN`;
+                        // Small delay for smooth entry
+                        setTimeout(() => img.classList.add('loaded'), 50);
+                        
+                        msg.innerText = `Loading Gallery... (${uniquePhotos.length} photos found)`;
+                    }
+                }
 
-                    wrapper.appendChild(img);
-                    wrapper.appendChild(overlay);
-
-                    // Pause/Resume Logic
-                    wrapper.addEventListener('mouseenter', () => {
-                        track.style.animationPlayState = 'paused';
-                        clearTimeout(resumeTimer);
-                        resumeTimer = setTimeout(() => { track.style.animationPlayState = 'running'; }, 10000);
+                // 4. Logistics: Duplicate for Infinite Scroll ONLY after all found
+                if (uniquePhotos.length > 0) {
+                    uniquePhotos.forEach(url => {
+                        const clone = document.createElement('img');
+                        clone.src = `${url}=w800`;
+                        clone.className = 'loaded'; // Clones appear instantly
+                        attachEvents(clone);
+                        track.appendChild(clone);
                     });
-
-                    wrapper.addEventListener('dblclick', () => {
-                        track.style.animationPlayState = 'running';
-                        clearTimeout(resumeTimer);
-                    });
-
-                    track.appendChild(wrapper);
-                });
-
-                document.getElementById('tickerFrame').style.display = "flex";
-                document.getElementById('status').innerText = "Active: Hover to see details.";
+                    
+                    spinner.style.display = 'none';
+                    msg.innerText = `Loaded ${uniquePhotos.length} photos. Continuous loop ready.`;
+                } else {
+                    msg.innerText = "No photos found. Check if album is public.";
+                }
 
             } catch (err) {
-                document.getElementById('status').innerText = "Error loading: " + err.message;
+                console.error(err);
+                msg.innerText = "Error fetching album. Please refresh.";
             }
         }
+
+        // Start the process
+        loadStream();
     </script>
 </body>
 </html>
