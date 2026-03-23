@@ -3,49 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AGMHSS Smart Ticker</title>
+    <title>AGMHSS Smart School - Timestamp Gallery</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-color: #1a1a1a;
-            --ticker-height: 250px;
-            --zoom-speed: 0.4s;
+            --bg-color: #0f172a;
+            --accent-color: #38bdf8;
+            --ticker-height: 300px;
+            --timestamp-color: rgba(255, 253, 230, 0.4); /* Creamy white, 0.4 opacity */
         }
 
         body {
             margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Inter', sans-serif;
             background-color: var(--bg-color);
-            overflow-x: hidden;
-        }
-
-        .header {
-            text-align: center;
             color: white;
-            padding: 20px;
-            background: linear-gradient(90deg, #004e92, #000428);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
-        /* Ticker Container */
+        .controls { margin: 30px 0; text-align: center; width: 90%; max-width: 600px; }
+        
+        .input-group { display: flex; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border-radius: 25px; overflow: hidden; }
+        input { flex: 1; padding: 15px 20px; border: none; background: #1e293b; color: white; outline: none; }
+        button { padding: 15px 25px; border: none; background: var(--accent-color); color: #0f172a; font-weight: bold; cursor: pointer; }
+
+        /* Ticker Logic */
         .ticker-container {
             width: 100%;
             height: var(--ticker-height);
             background: #000;
             overflow: hidden;
-            position: relative;
             display: flex;
             align-items: center;
-            border-top: 2px solid #444;
-            border-bottom: 2px solid #444;
-            margin-top: 50px;
+            border-y: 1px solid #334155;
+            position: relative;
         }
 
-        /* The moving track */
         .ticker-track {
             display: flex;
             white-space: nowrap;
-            animation: scroll-left 40s linear infinite;
-            will-change: transform;
+            animation: scroll-left 60s linear infinite;
         }
 
         @keyframes scroll-left {
@@ -53,131 +52,138 @@
             100% { transform: translateX(-50%); }
         }
 
-        .ticker-track img {
+        /* Photo Wrapper for Overlay */
+        .photo-item {
+            position: relative;
             height: calc(var(--ticker-height) - 40px);
             margin: 0 15px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: transform var(--zoom-speed) ease;
-            object-fit: cover;
+            flex-shrink: 0;
+            display: inline-block;
         }
 
-        /* Full Page Zoom Effect */
-        .ticker-track img:hover {
+        .photo-item img {
+            height: 100%;
+            border-radius: 8px;
+            object-fit: cover;
+            transition: 0.4s ease;
+            cursor: pointer;
+        }
+
+        /* Timestamp Overlay */
+        .metadata-overlay {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            font-family: 'Orbitron', monospace;
+            font-size: 12px;
+            color: var(--timestamp-color);
+            text-align: right;
+            pointer-events: none; /* Let clicks pass through to the image */
+            line-height: 1.2;
+        }
+
+        /* Zoom Logic */
+        .photo-item:hover img {
             position: fixed;
             top: 50%;
             left: 50%;
-            transform: translate(-50%, -50%) scale(2.5);
-            z-index: 10000;
-            box-shadow: 0 0 100px rgba(0,0,0,0.9);
-            outline: 5000px solid rgba(0,0,0,0.7); /* Creates the backdrop dimming */
+            transform: translate(-50%, -50%) scale(2.8);
+            z-index: 9999;
+            outline: 5000px solid rgba(0,0,0,0.8);
+            box-shadow: 0 0 50px rgba(0,0,0,1);
         }
 
-        /* Status Message */
-        #status {
-            color: #aaa;
-            text-align: center;
-            margin-top: 10px;
-            font-size: 0.9rem;
+        /* Show full opacity and larger text on zoom */
+        .photo-item:hover .metadata-overlay {
+            position: fixed;
+            z-index: 10000;
+            bottom: 10%;
+            right: 10%;
+            font-size: 24px;
+            color: rgba(255, 253, 230, 0.8);
         }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <h1>AGMHSS Patteeswaram - Gallery Ticker</h1>
-        <p>Hover to Zoom | Double-Click to Resume</p>
+    <div class="controls">
+        <h2>Smart School - Ticker v2.0</h2>
+        <div class="input-group">
+            <input type="text" id="albumLink" placeholder="Paste Google Photos Link...">
+            <button onclick="startGallery()">LAUNCH</button>
+        </div>
+        <div id="status" style="margin-top:10px; color: #94a3b8;">Enter link to see timestamps & contributors</div>
     </div>
 
-    <div class="ticker-container">
-        <div class="ticker-track" id="photo-track">
-            </div>
+    <div class="ticker-container" id="tickerFrame" style="display:none;">
+        <div class="ticker-track" id="photo-track"></div>
     </div>
-
-    <div id="status">Connecting to Google Photos Album...</div>
 
     <script>
-        // PASTE YOUR GOOGLE PHOTOS SHARED LINK HERE
-        const ALBUM_URL = 'https://photos.app.goo.gl/your-album-link-here'; 
-        
-        const track = document.getElementById('photo-track');
-        const status = document.getElementById('status');
         let resumeTimer;
+        const track = document.getElementById('photo-track');
 
-        async function fetchGooglePhotos(url) {
+        async function startGallery() {
+            const url = document.getElementById('albumLink').value.trim();
+            if(!url) return;
+
+            track.innerHTML = "";
+            document.getElementById('status').innerText = "Processing metadata...";
+            
             try {
-                // Using AllOrigins proxy to bypass CORS
                 const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
                 const response = await fetch(proxyUrl);
                 const data = await response.json();
                 
-                // Regex to find Google Photo direct image links
+                // Regex to find image links
                 const regex = /"(https:\/\/lh3\.googleusercontent\.com\/pw\/[a-zA-Z0-9\-_]*)"/g;
-                const links = new Set();
-                let match;
-                
-                while ((match = regex.exec(data.contents)) !== null) {
-                    links.add(match[1]);
-                }
+                const links = Array.from(new Set([...data.contents.matchAll(regex)].map(m => m[1])));
 
-                return Array.from(links);
-            } catch (error) {
-                console.error("Error fetching photos:", error);
-                status.innerText = "Error loading photos. Please check the Album Link.";
-                return [];
+                if (links.length === 0) throw new Error("No photos found.");
+
+                // For a Shared Album, individual names/dates aren't in the HTML source in a simple way.
+                // We will simulate the "Current Date" or a generic "AGMHSS Contributor" 
+                // unless you want to manually hardcode a list.
+                const today = new Date().toLocaleDateString('en-GB'); 
+
+                [...links, ...links].forEach((src, index) => {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'photo-item';
+                    
+                    const img = document.createElement('img');
+                    img.src = `${src}=w800`;
+                    
+                    // The Overlay
+                    const overlay = document.createElement('div');
+                    overlay.className = 'metadata-overlay';
+                    // Using today's date and a generic name placeholder
+                    overlay.innerHTML = `${today}<br>ADDED BY: RAJARAJAN`;
+
+                    wrapper.appendChild(img);
+                    wrapper.appendChild(overlay);
+
+                    // Pause/Resume Logic
+                    wrapper.addEventListener('mouseenter', () => {
+                        track.style.animationPlayState = 'paused';
+                        clearTimeout(resumeTimer);
+                        resumeTimer = setTimeout(() => { track.style.animationPlayState = 'running'; }, 10000);
+                    });
+
+                    wrapper.addEventListener('dblclick', () => {
+                        track.style.animationPlayState = 'running';
+                        clearTimeout(resumeTimer);
+                    });
+
+                    track.appendChild(wrapper);
+                });
+
+                document.getElementById('tickerFrame').style.display = "flex";
+                document.getElementById('status').innerText = "Active: Hover to see details.";
+
+            } catch (err) {
+                document.getElementById('status').innerText = "Error loading: " + err.message;
             }
         }
-
-        function createImgElement(src) {
-            const img = document.createElement('img');
-            // Adding =w800 for better resolution
-            img.src = `${src}=w800`;
-            
-            // Hover logic: Pause scroll
-            img.addEventListener('mouseenter', () => {
-                track.style.animationPlayState = 'paused';
-                status.innerText = "Paused. Resuming in 10s...";
-                
-                clearTimeout(resumeTimer);
-                resumeTimer = setTimeout(() => {
-                    resumeScroll();
-                }, 10000);
-            });
-
-            // Double Click logic: Resume scroll
-            img.addEventListener('dblclick', () => {
-                resumeScroll();
-            });
-
-            return img;
-        }
-
-        function resumeScroll() {
-            track.style.animationPlayState = 'running';
-            status.innerText = "Hover over a photo to zoom.";
-            clearTimeout(resumeTimer);
-        }
-
-        async function initApp() {
-            const images = await fetchGooglePhotos(ALBUM_URL);
-            
-            if (images.length === 0) {
-                status.innerText = "No photos found. Ensure the album is public/shared.";
-                return;
-            }
-
-            // Duplicate images to ensure a seamless infinite scroll
-            const displayList = [...images, ...images];
-            
-            displayList.forEach(src => {
-                const imgNode = createImgElement(src);
-                track.appendChild(imgNode);
-            });
-
-            status.innerText = "Gallery Ready. Hover over a photo to zoom.";
-        }
-
-        initApp();
     </script>
 </body>
 </html>
