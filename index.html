@@ -74,7 +74,6 @@
             border-top: 1px solid #1e293b;
             border-bottom: 1px solid #1e293b;
             overflow: hidden;
-            position: relative;
         }
 
         .track {
@@ -105,7 +104,6 @@
             width: auto;
             object-fit: cover;
             transition: transform 0.4s ease;
-            display: block;
         }
 
         .timestamp {
@@ -203,7 +201,7 @@
             track.innerHTML = '';
             frame.style.display = 'none';
             status.classList.add('loading');
-            status.textContent = 'Fetching album... Please wait (this can take 5–15 seconds)';
+            status.textContent = 'Fetching album... (this may take 8–15 seconds)';
 
             try {
                 const proxies = [
@@ -212,46 +210,58 @@
                 ];
 
                 let html = '';
-                for (const proxy of proxies) {
+
+                for (const proxyUrl of proxies) {
                     try {
-                        const res = await fetch(proxy, { signal: AbortSignal.timeout(15000) });
+                        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(20000) });
                         const data = await res.json();
-                        html = data.contents || data;
-                        if (html && html.length > 8000) break;
+
+                        // Handle both formats: {contents: "..."} or direct HTML string
+                        html = (data && typeof data === 'object' && data.contents) 
+                               ? data.contents 
+                               : (typeof data === 'string' ? data : JSON.stringify(data));
+
+                        if (html.length > 10000) break;
                     } catch (e) {
-                        console.warn('Proxy failed:', e);
+                        console.warn('Proxy attempt failed:', e);
                     }
                 }
 
-                if (!html || html.length < 8000) throw new Error("Could not load album page. Make sure it is publicly shared.");
-
-                // Improved regex for 2026 Google Photos structure
-                let imageUrls = [];
-                const regex1 = /https:\/\/lh3\.googleusercontent\.com\/[a-zA-Z0-9\-_\/=]+/g;
-                const regex2 = /https:\/\/photos\.fife\.usercontent\.google\.com\/[a-zA-Z0-9\-_\/=]+/g;
-
-                imageUrls = [
-                    ...html.matchAll(regex1),
-                    ...html.matchAll(regex2)
-                ].map(m => m[0]);
-
-                // Fallback aggressive search for any lh3 or googleusercontent link
-                if (imageUrls.length < 3) {
-                    const fallbackRegex = /https?:\/\/[^"'\s]+?\.googleusercontent\.com\/[^"'\s]+/g;
-                    imageUrls = [...html.matchAll(fallbackRegex)].map(m => m[0]);
+                if (!html || html.length < 5000) {
+                    throw new Error("Could not load the album page. Please ensure it is publicly shared with \"Anyone with the link\".");
                 }
 
+                // Robust image URL extraction
+                let imageUrls = [];
+
+                // Primary patterns for Google Photos
+                const patterns = [
+                    /https:\/\/lh3\.googleusercontent\.com\/[a-zA-Z0-9\-_\/=]+/g,
+                    /https:\/\/photos\.fife\.usercontent\.google\.com\/[a-zA-Z0-9\-_\/=]+/g,
+                    /https?:\/\/[^"'\s>]+?\.googleusercontent\.com\/[^"'\s>]+/g   // fallback aggressive
+                ];
+
+                for (const regex of patterns) {
+                    const matches = html.matchAll(regex);
+                    for (const match of matches) {
+                        imageUrls.push(match[0]);
+                    }
+                }
+
+                // Remove duplicates and clean
                 const uniqueImages = [...new Set(imageUrls)].filter(src => 
-                    src.includes('lh3.googleusercontent.com') || src.includes('usercontent.google.com')
+                    src.includes('googleusercontent.com') && 
+                    !src.includes('=w') && // avoid already resized thumbnails
+                    src.length > 40
                 );
 
                 if (uniqueImages.length === 0) {
-                    throw new Error("No photos found. Please ensure the album is set to \"Anyone with the link\" and try again.");
+                    throw new Error("No photos found in the album. Make sure the album is public and contains images.");
                 }
 
                 const dateStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
 
-                const allImages = [...uniqueImages, ...uniqueImages]; // for seamless loop
+                const allImages = [...uniqueImages, ...uniqueImages];
 
                 allImages.forEach(src => {
                     const wrap = document.createElement('div');
@@ -280,7 +290,7 @@
 
                 frame.style.display = 'flex';
                 status.classList.remove('loading');
-                status.textContent = `Success! Displaying ${uniqueImages.length} photos • Tap any image to zoom`;
+                status.textContent = `Loaded ${uniqueImages.length} photos • Tap image to zoom • Tap ticker to pause/resume`;
 
                 // Scroll controls
                 const pauseScroll = () => {
@@ -300,9 +310,8 @@
                 });
 
                 track.addEventListener('click', (e) => {
-                    if (!e.target.closest('#zoom-overlay')) {
-                        isPaused ? resumeScroll() : pauseScroll();
-                    }
+                    if (e.target.closest('#zoom-overlay')) return;
+                    isPaused ? resumeScroll() : pauseScroll();
                 });
 
                 track.addEventListener('mouseleave', () => {
@@ -330,4 +339,4 @@
         });
     </script>
 </body>
-</html>
+    </html>
