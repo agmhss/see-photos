@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AGMHSS Smart Gallery</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron&amp;display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg: #020617;
@@ -121,7 +121,6 @@
             pointer-events: none;
         }
 
-        /* Full-screen zoom overlay */
         #zoom-overlay {
             position: fixed;
             inset: 0;
@@ -166,7 +165,6 @@
         <div class="track" id="track"></div>
     </div>
 
-    <!-- Zoom Overlay -->
     <div id="zoom-overlay">
         <img id="zoom-img" alt="Zoomed photo">
     </div>
@@ -182,7 +180,6 @@
         let resumeTimer = null;
         let isPaused = false;
 
-        // Load saved link + auto-run
         window.onload = () => {
             const saved = localStorage.getItem('agmhss_album_link');
             if (saved) {
@@ -191,7 +188,6 @@
             }
         };
 
-        // Save on input change (optional debounce)
         input.addEventListener('change', () => {
             if (input.value.trim()) localStorage.setItem('agmhss_album_link', input.value.trim());
         });
@@ -207,56 +203,64 @@
             track.innerHTML = '';
             frame.style.display = 'none';
             status.classList.add('loading');
-            status.textContent = 'Fetching album from Google Photos...';
+            status.textContent = 'Fetching album... Please wait (this can take 5–15 seconds)';
 
             try {
-                // Try multiple CORS proxies
-                let html = '';
                 const proxies = [
                     `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
                     `https://corsproxy.io/?${encodeURIComponent(url)}`
                 ];
 
+                let html = '';
                 for (const proxy of proxies) {
                     try {
-                        const res = await fetch(proxy);
-                        if (!res.ok) throw new Error('Proxy failed');
+                        const res = await fetch(proxy, { signal: AbortSignal.timeout(15000) });
                         const data = await res.json();
-                        html = data.contents || data; // some proxies return {contents}, others raw
-                        if (html && html.length > 5000) break;
+                        html = data.contents || data;
+                        if (html && html.length > 8000) break;
                     } catch (e) {
-                        console.warn('Proxy failed, trying next...', e);
+                        console.warn('Proxy failed:', e);
                     }
                 }
 
-                if (!html || html.length < 10000) throw new Error("Could not load album. Make sure it's publicly shared.");
+                if (!html || html.length < 8000) throw new Error("Could not load album page. Make sure it is publicly shared.");
 
-                // More robust regex for current Google Photos structure (2026)
-                const regex = /https:\/\/(lh3\.googleusercontent\.com|photos\.fife\.usercontent\.google\.com)\/[a-zA-Z0-9\-_\/]+/g;
-                let matches = [...html.matchAll(regex)].map(m => m[0]);
+                // Improved regex for 2026 Google Photos structure
+                let imageUrls = [];
+                const regex1 = /https:\/\/lh3\.googleusercontent\.com\/[a-zA-Z0-9\-_\/=]+/g;
+                const regex2 = /https:\/\/photos\.fife\.usercontent\.google\.com\/[a-zA-Z0-9\-_\/=]+/g;
 
-                // Deduplicate and clean
-                const uniqueImages = [...new Set(matches)].filter(src => 
+                imageUrls = [
+                    ...html.matchAll(regex1),
+                    ...html.matchAll(regex2)
+                ].map(m => m[0]);
+
+                // Fallback aggressive search for any lh3 or googleusercontent link
+                if (imageUrls.length < 3) {
+                    const fallbackRegex = /https?:\/\/[^"'\s]+?\.googleusercontent\.com\/[^"'\s]+/g;
+                    imageUrls = [...html.matchAll(fallbackRegex)].map(m => m[0]);
+                }
+
+                const uniqueImages = [...new Set(imageUrls)].filter(src => 
                     src.includes('lh3.googleusercontent.com') || src.includes('usercontent.google.com')
                 );
 
-                if (uniqueImages.length === 0) throw new Error("No photos found. Is the album public?");
+                if (uniqueImages.length === 0) {
+                    throw new Error("No photos found. Please ensure the album is set to \"Anyone with the link\" and try again.");
+                }
 
-                const dateStr = new Date().toLocaleDateString('en-GB', { 
-                    day: '2-digit', month: '2-digit', year: 'numeric' 
-                }).replace(/\//g, '-');
+                const dateStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
 
-                // Duplicate the array for seamless infinite scroll
-                const allImages = [...uniqueImages, ...uniqueImages];
+                const allImages = [...uniqueImages, ...uniqueImages]; // for seamless loop
 
                 allImages.forEach(src => {
                     const wrap = document.createElement('div');
                     wrap.className = 'photo-wrap';
 
                     const img = document.createElement('img');
-                    img.src = `${src}=w1400`;           // good quality for ticker + zoom
-                    img.loading = 'lazy';
-                    img.alt = 'School photo';
+                    img.src = `${src}=w1200`;
+                    img.referrerPolicy = "no-referrer";
+                    img.loading = "lazy";
 
                     const meta = document.createElement('div');
                     meta.className = 'timestamp';
@@ -264,9 +268,9 @@
 
                     wrap.append(img, meta);
 
-                    // Click to zoom
                     wrap.addEventListener('click', () => {
-                        zoomImg.src = `${src}=w2000`;   // higher res for zoom
+                        zoomImg.src = `${src}=w2000`;
+                        zoomImg.referrerPolicy = "no-referrer";
                         zoomOverlay.style.display = 'flex';
                         pauseScroll();
                     });
@@ -276,11 +280,9 @@
 
                 frame.style.display = 'flex';
                 status.classList.remove('loading');
-                status.textContent = `Loaded ${uniqueImages.length} photos • Tap image to zoom • Scroll pauses on interaction`;
+                status.textContent = `Success! Displaying ${uniqueImages.length} photos • Tap any image to zoom`;
 
-                // Touch / mouse interaction
-                track.style.animationPlayState = 'running';
-
+                // Scroll controls
                 const pauseScroll = () => {
                     track.style.animationPlayState = 'paused';
                     isPaused = true;
@@ -297,14 +299,12 @@
                     if (!isPaused) resumeScroll();
                 });
 
-                // Tap anywhere on track to toggle pause (great for touch devices)
                 track.addEventListener('click', (e) => {
-                    if (e.target.closest('#zoom-overlay')) return;
-                    if (isPaused) resumeScroll();
-                    else pauseScroll();
+                    if (!e.target.closest('#zoom-overlay')) {
+                        isPaused ? resumeScroll() : pauseScroll();
+                    }
                 });
 
-                // Auto-resume after 12 seconds of inactivity
                 track.addEventListener('mouseleave', () => {
                     clearTimeout(resumeTimer);
                     resumeTimer = setTimeout(() => {
@@ -314,25 +314,20 @@
 
             } catch (err) {
                 status.classList.remove('loading');
-                status.textContent = `Error: ${err.message}. Make sure the album is set to "Anyone with the link"`;
+                status.textContent = `Error: ${err.message}`;
                 console.error(err);
             }
         }
 
-        // Button handler
         document.getElementById('loadBtn').addEventListener('click', run);
 
-        // Close zoom overlay
         zoomOverlay.addEventListener('click', () => {
             zoomOverlay.style.display = 'none';
         });
 
-        // Keyboard support
         document.addEventListener('keydown', e => {
-            if (e.key === 'Escape' && zoomOverlay.style.display === 'flex') {
-                zoomOverlay.style.display = 'none';
-            }
+            if (e.key === 'Escape') zoomOverlay.style.display = 'none';
         });
     </script>
 </body>
-    </html>
+</html>
